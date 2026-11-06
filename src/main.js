@@ -1,6 +1,6 @@
 import "./style.css";
 import * as db from "./db.js";
-import { dHash, findDuplicate } from "./hash.js";
+import { rotatedHashes, colorHistogram, findDuplicate } from "./hash.js";
 import { suggestName, rollRarity } from "./naming.js";
 import { loadSegmenter, segmentCenter, maskStats, isPlausible, cutout, centerCrop, drawMaskOverlay } from "./segment.js";
 
@@ -126,6 +126,44 @@ function grabVisible(max) {
 let liveTimer = null;
 let liveBusy = false;
 let segmenterReady = false;
+
+/* Auto-Auslöser: fires when the sticker has been held still for a moment. */
+const AUTO_HOLD_MS = 1200;
+let autoOn = localStorage.getItem("stickerdex.auto") !== "off";
+let lastBox = null;
+let stableSince = 0;
+let autoBlockedUntil = 0;
+function setAutoProgress(p) {
+  $("shutter").style.setProperty("--progress", `${Math.round(p * 100)}%`);
+  $("shutter").classList.toggle("charging", p > 0);
+}
+function updateAutoButton() {
+  $("auto-toggle").textContent = autoOn ? "AUTO an" : "AUTO aus";
+  $("auto-toggle").classList.toggle("on", autoOn);
+}
+$("auto-toggle").addEventListener("click", () => {
+  autoOn = !autoOn;
+  localStorage.setItem("stickerdex.auto", autoOn ? "on" : "off");
+  updateAutoButton();
+  stableSince = 0;
+  setAutoProgress(0);
+  toast(autoOn ? "Auto-Auslöser an: Sticker kurz ruhig halten" : "Auto-Auslöser aus");
+});
+updateAutoButton();
+
+/** Same spot and size as last frame (within ~6 % of the frame)? */
+function isSteady(box, w, h) {
+  const prev = lastBox;
+  lastBox = box;
+  if (!prev) return false;
+  const tol = 0.06;
+  return (
+    Math.abs(box.minX - prev.minX) / w < tol &&
+    Math.abs(box.maxX - prev.maxX) / w < tol &&
+    Math.abs(box.minY - prev.minY) / h < tol &&
+    Math.abs(box.maxY - prev.maxY) / h < tol
+  );
+}
 function scheduleLive() {
   clearTimeout(liveTimer);
   liveTimer = setTimeout(liveTick, segmenterReady ? 300 : 50);
@@ -146,12 +184,30 @@ async function liveTick() {
     const c = grabVisible(256);
     if (c) {
       const mask = await segmentCenter(c);
-      const ok = isPlausible(maskStats(mask));
+      const stats = maskStats(mask);
+      const ok = isPlausible(stats);
       if (ok) drawMaskOverlay(overlay, mask);
       overlay.style.opacity = ok ? "1" : "0";
       frame.classList.toggle("locked", ok);
       hint.classList.toggle("locked", ok);
-      hint.textContent = ok ? "Sticker erkannt ✨" : "Sticker in die Mitte halten";
+      hint.textContent = ok ? (autoOn ? "Sticker erkannt – ruhig halten ✨" : "Sticker erkannt ✨") : "Sticker in die Mitte halten";
+
+      const now = Date.now();
+      if (ok && autoOn && now > autoBlockedUntil && isSteady(stats, mask.width, mask.height)) {
+        stableSince ||= now;
+        const progress = Math.min(1, (now - stableSince) / AUTO_HOLD_MS);
+        setAutoProgress(progress);
+        if (progress >= 1) {
+          stableSince = 0;
+          setAutoProgress(0);
+          liveBusy = false;
+          capture();
+        }
+      } else {
+        if (!ok) lastBox = null;
+        stableSince = 0;
+        setAutoProgress(0);
+      }
     }
   } catch (err) {
     console.error(err);
@@ -165,9 +221,22 @@ async function liveTick() {
 
 /* ---------------- Capture ---------------- */
 
-let current = null; // { canvas, hash, duplicate, rarity }
+let current = null; // { canvas, hashes, hist, duplicate, rarity }
+let capturing = false;
 
-$("shutter").addEventListener("click", async () => {
+$("shutter").addEventListener("click", () => capture());
+
+async function capture() {
+  if (capturing || !$("catch").classList.contains("hidden")) return;
+  capturing = true;
+  try {
+    await doCapture();
+  } finally {
+    capturing = false;
+  }
+}
+
+async function doCapture() {
   const shot = grabVisible(1024);
   if (!shot) return;
   const flash = document.createElement("div");
@@ -195,11 +264,12 @@ $("shutter").addEventListener("click", async () => {
   }
   $("shutter").disabled = false;
 
-  const hash = dHash(sticker);
-  const duplicate = findDuplicate(hash, await db.getAll());
-  current = { canvas: sticker, hash, duplicate, rarity: rollRarity() };
+  const hashes = rotatedHashes(sticker);
+  const hist = colorHistogram(sticker);
+  const duplicate = findDuplicate(hashes, hist, await db.getAll());
+  current = { canvas: sticker, hashes, hist, duplicate, rarity: rollRarity() };
   showCatch();
-});
+}
 
 function showCatch() {
   const { canvas, duplicate, rarity } = current;
@@ -232,6 +302,9 @@ function showCatch() {
 function closeCatch() {
   $("catch").classList.add("hidden");
   current = null;
+  // Don't auto-capture the same sticker again right away.
+  autoBlockedUntil = Date.now() + 2500;
+  lastBox = null;
 }
 
 $("catch-retry").addEventListener("click", closeCatch);
@@ -253,7 +326,7 @@ $("catch-keep").addEventListener("click", async () => {
   }
   const image = await canvasToBlob(cur.canvas);
   const name = $("catch-name-input").value.trim() || suggestName(cur.canvas);
-  const record = await db.add({ image, hash: cur.hash, name, seltenheit: cur.rarity });
+  const record = await db.add({ image, hash: cur.hashes[0], hist: cur.hist, name, seltenheit: cur.rarity });
   toast(`${pad(record.nr)} ${record.name} eingesammelt! ✨`);
 });
 

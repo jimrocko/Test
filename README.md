@@ -15,11 +15,15 @@ startet die App im Vollbild wie eine normale App.
 
 - **Kamera-Tab:** Live-Vorschau mit Rahmen in der Mitte. Ein erkannter Sticker wird gelb markiert.
   Auslösen stellt ihn frei (transparenter Hintergrund, weiße Stickerkante).
+- **Auto-Auslöser:** Hältst du den Sticker ruhig, füllt sich der Auslöser-Ring und die App
+  fotografiert von selbst. Mit dem Knopf „AUTO“ lässt er sich ausschalten.
 - **Fang-Karte:** Namensvorschlag nach Hauptfarbe („Blauer Sticker“), frei änderbar. Die Seltenheit
   wird zufällig gezogen wie bei einem Booster-Pack: gewöhnlich 60 %, selten 25 %, episch 12 %, legendär 3 %.
 - **Stickerdex-Tab:** Nummerierte Sammlung (#001, #002, …), Seltenheitsfarben, Holo-Effekt für
   epische und legendäre Sticker. In der Detailansicht kannst du Name und Notiz bearbeiten.
 - **Duplikat-Erkennung:** Fotografierst du einen Sticker, den du schon hast, zählt er als ×2, ×3, …
+  Verglichen werden Farben und Form, auch wenn der Sticker gedreht ist. Bei einem Fehlgriff hilft
+  „Ist doch ein anderer“.
 - **Kostenlos und lokal:** keine KI-API, kein Server, kein Account. Die Freistellung läuft auf dem
   Gerät (MediaPipe „Magic Touch“), die Sammlung liegt in IndexedDB im Browser. Nach dem ersten
   Laden funktioniert die App auch offline.

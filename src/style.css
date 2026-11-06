@@ -149,3 +149,12 @@ main { position: fixed; inset: 0 0 calc(var(--tabbar-h) + var(--safe-b)) 0; }
 .note:empty::before { content: attr(data-placeholder); color: var(--muted); }
 .pill.rarity.reveal { animation: reveal .6s cubic-bezier(.2,1.6,.4,1); }
 @keyframes reveal { 0% { transform: scale(0) rotate(-20deg); } 100% { transform: none; } }
+
+/* Auto-Auslöser */
+.auto-toggle { position: absolute; right: 18px; bottom: 46px; padding: 8px 12px; border-radius: 99px; border: 0;
+  background: rgba(0,0,0,.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); font-size: 12px; font-weight: 800;
+  letter-spacing: .5px; color: var(--muted); }
+.auto-toggle.on { color: var(--accent); }
+.shutter { --progress: 0%; }
+.shutter.charging { border-color: transparent;
+  background: conic-gradient(var(--accent) var(--progress), rgba(255,255,255,.35) 0) border-box; }
