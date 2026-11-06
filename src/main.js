@@ -1,10 +1,11 @@
 import "./style.css";
 import * as db from "./db.js";
+import { imageBlob } from "./db.js";
 import { rotatedHashes, colorHistogram, findDuplicate } from "./hash.js";
 import { suggestName, rollRarity } from "./naming.js";
 import { renderMap, currentLocation } from "./map.js";
 import { shareCard } from "./share.js";
-import { loadSegmenter, segmentCenter, maskStats, isPlausible, cutout, centerCrop, drawMaskOverlay } from "./segment.js";
+import { loadSegmenter, segmentCenter, maskStats, isPlausible, cutout, centerCrop, drawOutline } from "./segment.js";
 
 const $ = (id) => document.getElementById(id);
 const video = $("video");
@@ -28,13 +29,12 @@ const canvasToBlob = (c) => new Promise((r) => c.toBlob(r, "image/png"));
 
 const urlCache = new Map();
 function imageUrl(sticker) {
-  let entry = urlCache.get(sticker.id);
-  if (!entry || entry.blob !== sticker.image) {
-    if (entry) URL.revokeObjectURL(entry.url);
-    entry = { blob: sticker.image, url: URL.createObjectURL(sticker.image) };
-    urlCache.set(sticker.id, entry);
+  let url = urlCache.get(sticker.id);
+  if (!url) {
+    url = URL.createObjectURL(imageBlob(sticker));
+    urlCache.set(sticker.id, url);
   }
-  return entry.url;
+  return url;
 }
 
 function metaPills(el, s) {
@@ -186,12 +186,12 @@ async function liveTick() {
       segmenterReady = true;
       hint.textContent = "Sticker in die Mitte halten";
     }
-    const c = grabVisible(256);
+    const c = grabVisible(320);
     if (c) {
       const mask = await segmentCenter(c);
       const stats = maskStats(mask);
       const ok = isPlausible(stats);
-      if (ok) drawMaskOverlay(overlay, mask);
+      if (ok) drawOutline(overlay, mask);
       overlay.style.opacity = ok ? "1" : "0";
       frame.classList.toggle("locked", ok);
       hint.classList.toggle("locked", ok);
@@ -323,18 +323,26 @@ $("catch-new-anyway").addEventListener("click", () => {
 
 $("catch-keep").addEventListener("click", async () => {
   const cur = current;
+  if (!cur) return;
+  const name = $("catch-name-input").value.trim() || suggestName(cur.canvas);
   closeCatch();
-  if (cur.duplicate) {
-    const s = await db.get(cur.duplicate.id);
-    s.count += 1;
-    await db.put(s);
-    toast(`${s.name} ×${s.count} 🎉`);
+  let record;
+  try {
+    if (cur.duplicate) {
+      const s = await db.get(cur.duplicate.id);
+      s.count += 1;
+      await db.put(s);
+      toast(`${s.name} ×${s.count} 🎉`);
+      return;
+    }
+    const imageData = await (await canvasToBlob(cur.canvas)).arrayBuffer();
+    record = await db.add({ imageData, imageType: "image/png", hash: cur.hashes[0], hist: cur.hist, name, seltenheit: cur.rarity });
+    toast(`${pad(record.nr)} ${record.name} eingesammelt! ✨`);
+  } catch (err) {
+    console.error(err);
+    toast(`Speichern fehlgeschlagen: ${err?.message ?? err}`, 6000);
     return;
   }
-  const image = await canvasToBlob(cur.canvas);
-  const name = $("catch-name-input").value.trim() || suggestName(cur.canvas);
-  const record = await db.add({ image, hash: cur.hashes[0], hist: cur.hist, name, seltenheit: cur.rarity });
-  toast(`${pad(record.nr)} ${record.name} eingesammelt! ✨`);
   const location = await cur.locationPromise;
   if (location) {
     const fresh = await db.get(record.id);

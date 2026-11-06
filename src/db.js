@@ -23,6 +23,7 @@ async function tx(mode, fn) {
     const result = fn(t.objectStore(STORE));
     t.oncomplete = () => resolve(result.result ?? result);
     t.onerror = () => reject(t.error);
+    t.onabort = () => reject(t.error ?? new Error("Speichern abgebrochen (Speicher voll?)"));
   });
 }
 
@@ -30,6 +31,15 @@ export const getAll = () => tx("readonly", (s) => s.getAll());
 export const get = (id) => tx("readonly", (s) => s.get(id));
 export const put = (sticker) => tx("readwrite", (s) => s.put(sticker));
 export const remove = (id) => tx("readwrite", (s) => s.delete(id));
+
+/**
+ * The picture is stored as raw bytes (ArrayBuffer) – Safari on iOS can fail to
+ * store Blob objects in IndexedDB. Older entries may still hold a Blob.
+ */
+export function imageBlob(sticker) {
+  if (sticker.image instanceof Blob) return sticker.image;
+  return new Blob([sticker.imageData], { type: sticker.imageType ?? "image/png" });
+}
 
 /** Adds a new sticker and assigns the next dex number (#001, #002, …). */
 export async function add(sticker) {

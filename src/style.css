@@ -30,7 +30,7 @@ main { position: fixed; inset: 0 0 calc(var(--tabbar-h) + var(--safe-b)) 0; }
 /* ---------- Kamera ---------- */
 #view-camera { background: #000; overflow: hidden; }
 #video, #overlay { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-#overlay { pointer-events: none; transition: opacity .2s; }
+#overlay { pointer-events: none; transition: opacity .25s; filter: drop-shadow(0 0 4px rgba(255,214,0,.95)) drop-shadow(0 0 10px rgba(255,214,0,.6)); }
 .frame { position: absolute; left: 50%; top: 50%; width: min(68vw, 52vh); aspect-ratio: 1; transform: translate(-50%, -50%);
   pointer-events: none; transition: transform .25s; }
 .frame span { position: absolute; width: 34px; height: 34px; border: 4px solid rgba(255,255,255,.85); }
@@ -174,3 +174,4 @@ main { position: fixed; inset: 0 0 calc(var(--tabbar-h) + var(--safe-b)) 0; }
 .leaflet-container { font: inherit; }
 #view-dex.map-mode { display: flex; flex-direction: column; overflow: hidden; }
 #view-dex.map-mode .map-wrap { flex: 1; height: auto; }
+.btn.wide { width: 100%; margin-top: 10px; }

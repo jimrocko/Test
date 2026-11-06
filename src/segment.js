@@ -46,7 +46,94 @@ export async function segmentCenter(canvas) {
   const data = Float32Array.from(mask.getAsFloat32Array());
   const out = { data, width: mask.width, height: mask.height };
   masks.forEach((m) => m.close());
-  return out;
+  return refineMask(out);
+}
+
+/**
+ * Cleans up the raw model output so the sticker comes out as one solid piece:
+ * 1. keep only the blob under (or nearest to) the centre – drops stray specks
+ * 2. fill holes inside it (text, logos, shiny spots the model left out)
+ * 3. light blur for a smooth, anti-aliased edge
+ */
+export function refineMask(mask, threshold = 0.5) {
+  const { data, width: w, height: h } = mask;
+  const n = w * h;
+  const fg = new Uint8Array(n);
+  for (let i = 0; i < n; i++) fg[i] = data[i] > threshold ? 1 : 0;
+
+  // 1. Seed: centre pixel, or the closest foreground pixel within 15 % of the frame.
+  const cx = w >> 1, cy = h >> 1;
+  let seed = -1;
+  const maxR = Math.round(Math.min(w, h) * 0.15);
+  for (let r = 0; r <= maxR && seed < 0; r++) {
+    for (let dy = -r; dy <= r && seed < 0; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const i = (cy + dy) * w + (cx + dx);
+        if (fg[i]) {
+          seed = i;
+          break;
+        }
+      }
+    }
+  }
+  const region = new Uint8Array(n);
+  if (seed < 0) return { data: new Float32Array(n), width: w, height: h };
+
+  // Flood fill the centre blob.
+  const stack = [seed];
+  region[seed] = 1;
+  while (stack.length) {
+    const i = stack.pop();
+    const x = i % w, y = (i / w) | 0;
+    if (x > 0 && fg[i - 1] && !region[i - 1]) (region[i - 1] = 1), stack.push(i - 1);
+    if (x < w - 1 && fg[i + 1] && !region[i + 1]) (region[i + 1] = 1), stack.push(i + 1);
+    if (y > 0 && fg[i - w] && !region[i - w]) (region[i - w] = 1), stack.push(i - w);
+    if (y < h - 1 && fg[i + w] && !region[i + w]) (region[i + w] = 1), stack.push(i + w);
+  }
+
+  // 2. Everything outside the blob that can't be reached from the image border is a hole → fill it.
+  const outside = new Uint8Array(n);
+  const q = [];
+  const push = (i) => {
+    if (!region[i] && !outside[i]) {
+      outside[i] = 1;
+      q.push(i);
+    }
+  };
+  for (let x = 0; x < w; x++) push(x), push((h - 1) * w + x);
+  for (let y = 0; y < h; y++) push(y * w), push(y * w + w - 1);
+  while (q.length) {
+    const i = q.pop();
+    const x = i % w, y = (i / w) | 0;
+    if (x > 0) push(i - 1);
+    if (x < w - 1) push(i + 1);
+    if (y > 0) push(i - w);
+    if (y < h - 1) push(i + w);
+  }
+
+  // 3. Solid inside, soft 1–2 px edge.
+  const solid = new Float32Array(n);
+  for (let i = 0; i < n; i++) solid[i] = outside[i] ? 0 : 1;
+  const out = new Float32Array(n);
+  const k = Math.max(1, Math.round(Math.max(w, h) / 500));
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let sum = 0, cnt = 0;
+      for (let dy = -k; dy <= k; dy++) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= h) continue;
+        for (let dx = -k; dx <= k; dx++) {
+          const xx = x + dx;
+          if (xx < 0 || xx >= w) continue;
+          sum += solid[yy * w + xx];
+          cnt++;
+        }
+      }
+      out[y * w + x] = sum / cnt;
+    }
+  }
+  return { data: out, width: w, height: h };
 }
 
 /** Bounding box + coverage of mask pixels above a threshold. */
@@ -116,21 +203,41 @@ export function centerCrop(source, fraction = 0.6) {
   return out;
 }
 
-/** Paints the mask as a glowing tint into an overlay canvas (live preview). */
-export function drawMaskOverlay(overlay, mask, color = [255, 214, 0]) {
-  const { width, height, data } = mask;
-  overlay.width = width;
-  overlay.height = height;
-  const ctx = overlay.getContext("2d");
-  const img = ctx.createImageData(width, height);
+/**
+ * Draws just a clean outline around the detected sticker into the overlay
+ * canvas (live preview). The glow comes from a CSS drop-shadow.
+ */
+export function drawOutline(overlay, mask, thickness = 3) {
+  const { width: w, height: h, data } = mask;
+  const m = document.createElement("canvas");
+  m.width = w;
+  m.height = h;
+  const mctx = m.getContext("2d");
+  const img = mctx.createImageData(w, h);
   for (let i = 0; i < data.length; i++) {
-    const c = data[i];
-    if (c > 0.5) {
-      img.data[i * 4] = color[0];
-      img.data[i * 4 + 1] = color[1];
-      img.data[i * 4 + 2] = color[2];
-      img.data[i * 4 + 3] = 110;
-    }
+    img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = 255;
+    img.data[i * 4 + 3] = Math.round(Math.min(1, data[i] * 1.6) * 255);
   }
-  ctx.putImageData(img, 0, 0);
+  mctx.putImageData(img, 0, 0);
+
+  const dpr = window.devicePixelRatio || 1;
+  const W = Math.round(overlay.clientWidth * dpr), H = Math.round(overlay.clientHeight * dpr);
+  if (overlay.width !== W || overlay.height !== H) {
+    overlay.width = W;
+    overlay.height = H;
+  }
+  const ctx = overlay.getContext("2d");
+  ctx.clearRect(0, 0, W, H);
+  ctx.imageSmoothingEnabled = true;
+  ctx.globalCompositeOperation = "source-over";
+  // Grow the shape a bit in every direction …
+  const r = thickness * dpr;
+  for (let a = 0; a < 360; a += 20) {
+    const t = (a * Math.PI) / 180;
+    ctx.drawImage(m, Math.cos(t) * r, Math.sin(t) * r, W, H);
+  }
+  // … then punch the shape itself out again → only the ring remains.
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.drawImage(m, 0, 0, W, H);
+  ctx.globalCompositeOperation = "source-over";
 }

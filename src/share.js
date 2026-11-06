@@ -1,3 +1,5 @@
+import { imageBlob } from "./db.js";
+
 // Turns a sticker into a shareable trading-card image (PNG), drawn on a canvas.
 const RARITY_COLORS = {
   gewöhnlich: "#9aa1b2",
@@ -70,7 +72,7 @@ export async function renderCard(sticker) {
   }
 
   // Sticker with white die-cut edge + shadow
-  const img = await createImageBitmap(sticker.image);
+  const img = await createImageBitmap(imageBlob(sticker));
   const scale = Math.min((pw - 90) / img.width, (ph - 90) / img.height);
   const iw = img.width * scale, ih = img.height * scale;
   const ix = W / 2 - iw / 2, iy = py + ph / 2 - ih / 2;

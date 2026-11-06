@@ -1,7 +1,8 @@
 // Duplicate detection without any server:
 // 1. colour histogram, which doesn't care about rotation at all
 // 2. "difference hash" of the shape/contrast, checked in 4 rotations
-const SIZE = 16; // 16x16 grid → 256-bit hash (stored as hex)
+const SIZE = 16;
+const DUPE_MIN_SIM = 0.7; // 16x16 grid → 256-bit hash (stored as hex)
 
 function draw(canvas, w, h, rotation = 0) {
   const c = document.createElement("canvas");
@@ -34,7 +35,7 @@ export function dHash(canvas, rotation = 0) {
 /** Hashes of the sticker turned by 0°, 90°, 180° and 270°. */
 export const rotatedHashes = (canvas) => [0, 90, 180, 270].map((r) => dHash(canvas, r));
 
-/** 4×4×4 colour histogram of the non-transparent pixels, normalised to sum 1. */
+/** 8×8×8 colour histogram of the non-transparent pixels, normalised to sum 1. */
 export function colorHistogram(canvas) {
   const size = 64;
   const c = document.createElement("canvas");
@@ -42,11 +43,11 @@ export function colorHistogram(canvas) {
   const ctx = c.getContext("2d", { willReadFrequently: true });
   ctx.drawImage(canvas, 0, 0, size, size);
   const px = ctx.getImageData(0, 0, size, size).data;
-  const hist = new Array(64).fill(0);
+  const hist = new Array(512).fill(0);
   let n = 0;
   for (let i = 0; i < px.length; i += 4) {
     if (px[i + 3] < 128) continue;
-    hist[(px[i] >> 6) * 16 + (px[i + 1] >> 6) * 4 + (px[i + 2] >> 6)]++;
+    hist[(px[i] >> 5) * 64 + (px[i + 1] >> 5) * 8 + (px[i + 2] >> 5)]++;
     n++;
   }
   return n ? hist.map((v) => v / n) : hist;
@@ -78,12 +79,13 @@ export function histSimilarity(a, b) {
 export function findDuplicate(hashes, hist, stickers) {
   let best = null;
   for (const s of stickers) {
-    if (!s.hash) continue;
+    // Entries from older versions (other histogram format) are skipped.
+    if (!s.hash || s.hist?.length !== hist.length) continue;
     const d = Math.min(...hashes.map((h) => distance(h, s.hash)));
-    const sim = s.hist ? histSimilarity(hist, s.hist) : 0;
+    const sim = histSimilarity(hist, s.hist);
     // The outline alone isn't enough (many stickers are rounded rectangles),
     // so the colours have to match too.
-    const isDupe = s.hist ? sim >= 0.8 && (d <= 60 || sim >= 0.9) : d <= 40;
+    const isDupe = sim >= DUPE_MIN_SIM && d <= 64;
     const score = sim - d / 256;
     if (isDupe && (!best || score > best.score)) best = { sticker: s, score };
   }
