@@ -141,3 +141,11 @@ main { position: fixed; inset: 0 0 calc(var(--tabbar-h) + var(--safe-b)) 0; }
 .toast { position: fixed; z-index: 20; left: 50%; bottom: calc(var(--tabbar-h) + var(--safe-b) + 110px); transform: translateX(-50%);
   max-width: 90vw; padding: 10px 16px; border-radius: 14px; background: #2c3240; font-weight: 600; font-size: 14px; text-align: center;
   box-shadow: 0 8px 30px rgba(0,0,0,.4); animation: fade .2s; }
+
+.name-input { width: 100%; margin: 8px 0 2px; padding: 10px 12px; border-radius: 12px; border: 1px solid #343a48; background: var(--bg);
+  color: var(--text); font: inherit; font-size: 20px; font-weight: 700; text-align: center; }
+.note { outline: none; border-radius: 10px; padding: 6px 8px; margin-left: -8px; margin-right: -8px; }
+.note:focus { background: var(--bg); }
+.note:empty::before { content: attr(data-placeholder); color: var(--muted); }
+.pill.rarity.reveal { animation: reveal .6s cubic-bezier(.2,1.6,.4,1); }
+@keyframes reveal { 0% { transform: scale(0) rotate(-20deg); } 100% { transform: none; } }

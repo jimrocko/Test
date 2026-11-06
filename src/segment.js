@@ -3,7 +3,10 @@
 // the model returns a mask of the object under that point.
 import { FilesetResolver, InteractiveSegmenterLegacy } from "@mediapipe/tasks-vision";
 
-const BASE = import.meta.env.BASE_URL;
+// WASM runtime + model come from public CDNs (cached by the service worker).
+const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.2/wasm";
+const MODEL_URL =
+  "https://storage.googleapis.com/mediapipe-models/interactive_segmenter/magic_touch/float32/1/magic_touch.tflite";
 const CENTER = { keypoint: { x: 0.5, y: 0.5 } };
 
 let segmenterPromise = null;
@@ -11,10 +14,10 @@ let segmenterPromise = null;
 export function loadSegmenter() {
   if (!segmenterPromise) {
     segmenterPromise = (async () => {
-      const fileset = await FilesetResolver.forVisionTasks(`${BASE}vendor/wasm`);
+      const fileset = await FilesetResolver.forVisionTasks(WASM_URL);
       const create = (delegate) =>
         InteractiveSegmenterLegacy.createFromOptions(fileset, {
-          baseOptions: { modelAssetPath: `${BASE}vendor/magic_touch.tflite`, delegate },
+          baseOptions: { modelAssetPath: MODEL_URL, delegate },
           outputCategoryMask: false,
           outputConfidenceMasks: true,
         });

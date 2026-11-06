@@ -1,7 +1,7 @@
 import "./style.css";
 import * as db from "./db.js";
 import { dHash, findDuplicate } from "./hash.js";
-import { describeSticker, describeError, settings, MODELS } from "./ai.js";
+import { suggestName, rollRarity } from "./naming.js";
 import { loadSegmenter, segmentCenter, maskStats, isPlausible, cutout, centerCrop, drawMaskOverlay } from "./segment.js";
 
 const $ = (id) => document.getElementById(id);
@@ -23,14 +23,6 @@ function toast(msg, ms = 2800) {
 
 const pad = (n) => `#${String(n).padStart(3, "0")}`;
 const canvasToBlob = (c) => new Promise((r) => c.toBlob(r, "image/png"));
-async function blobToCanvas(blob) {
-  const bmp = await createImageBitmap(blob);
-  const c = document.createElement("canvas");
-  c.width = bmp.width;
-  c.height = bmp.height;
-  c.getContext("2d").drawImage(bmp, 0, 0);
-  return c;
-}
 
 const urlCache = new Map();
 function imageUrl(sticker) {
@@ -164,6 +156,7 @@ async function liveTick() {
   } catch (err) {
     console.error(err);
     hint.textContent = "Erkennung nicht verfügbar – Foto geht trotzdem";
+    await new Promise((r) => setTimeout(r, 3000)); // back off before retrying
   } finally {
     liveBusy = false;
     if (stream) scheduleLive();
@@ -172,7 +165,7 @@ async function liveTick() {
 
 /* ---------------- Capture ---------------- */
 
-let current = null; // { canvas, hash, entry, duplicate, describing }
+let current = null; // { canvas, hash, duplicate, rarity }
 
 $("shutter").addEventListener("click", async () => {
   const shot = grabVisible(1024);
@@ -204,63 +197,36 @@ $("shutter").addEventListener("click", async () => {
 
   const hash = dHash(sticker);
   const duplicate = findDuplicate(hash, await db.getAll());
-  current = { canvas: sticker, hash, entry: null, duplicate, describing: null };
+  current = { canvas: sticker, hash, duplicate, rarity: rollRarity() };
   showCatch();
 });
 
 function showCatch() {
-  const { canvas, duplicate } = current;
+  const { canvas, duplicate, rarity } = current;
   $("catch-img").src = canvas.toDataURL("image/png");
   $("catch-new-anyway").classList.toggle("hidden", !duplicate);
+  $("catch-name").classList.toggle("hidden", !duplicate);
+  $("catch-name-input").classList.toggle("hidden", !!duplicate);
   const badge = $("catch-badge");
+  const shown = duplicate ? { ...duplicate, count: duplicate.count + 1 } : { seltenheit: rarity };
   if (duplicate) {
     badge.textContent = `Schon im Dex! ${pad(duplicate.nr)}`;
     badge.classList.add("dupe");
     $("catch-name").textContent = duplicate.name;
-    $("catch-desc").textContent = duplicate.beschreibung ?? "";
-    metaPills($("catch-meta"), { ...duplicate, count: duplicate.count + 1 });
-    setRarity($("catch-card"), duplicate.seltenheit);
-    $("catch-stage").classList.toggle("holo", isHolo(duplicate.seltenheit));
+    $("catch-desc").textContent = duplicate.notiz ?? "";
     $("catch-keep").textContent = "Duplikat zählen (+1)";
   } else {
     badge.textContent = "Neuer Sticker!";
     badge.classList.remove("dupe");
+    $("catch-name-input").value = suggestName(canvas);
+    $("catch-desc").textContent = "";
     $("catch-keep").textContent = "Einsammeln ✨";
-    setRarity($("catch-card"), null);
-    $("catch-stage").classList.remove("holo");
-    $("catch-meta").innerHTML = "";
-    startDescribing();
   }
+  metaPills($("catch-meta"), shown);
+  $("catch-meta").querySelector(".rarity")?.classList.add("reveal");
+  setRarity($("catch-card"), shown.seltenheit);
+  $("catch-stage").classList.toggle("holo", isHolo(shown.seltenheit));
   $("catch").classList.remove("hidden");
-}
-
-function startDescribing() {
-  const cur = current;
-  if (!settings.apiKey) {
-    $("catch-name").textContent = "Unbekannter Sticker";
-    $("catch-desc").textContent = "Tipp: Mit einem API-Schlüssel (⚙︎ im Dex) bekommt jeder Sticker automatisch Name und Beschreibung.";
-    return;
-  }
-  $("catch-name").textContent = "Wird erkannt …";
-  $("catch-desc").innerHTML = '<span class="spinner"></span>';
-  cur.describing = describeSticker(cur.canvas);
-  cur.describing.then(
-    (entry) => {
-      cur.entry = entry;
-      if (current !== cur || cur.duplicate) return;
-      $("catch-name").textContent = entry.name;
-      $("catch-desc").textContent = entry.beschreibung;
-      metaPills($("catch-meta"), entry);
-      setRarity($("catch-card"), entry.seltenheit);
-      $("catch-stage").classList.toggle("holo", isHolo(entry.seltenheit));
-    },
-    (err) => {
-      cur.error = describeError(err);
-      if (current !== cur) return;
-      $("catch-name").textContent = "Unbekannter Sticker";
-      $("catch-desc").textContent = cur.error;
-    },
-  );
 }
 
 function closeCatch() {
@@ -286,21 +252,13 @@ $("catch-keep").addEventListener("click", async () => {
     return;
   }
   const image = await canvasToBlob(cur.canvas);
-  const base = { image, hash: cur.hash, name: "Unbekannter Sticker", ...(cur.entry ?? {}) };
-  const record = await db.add(base);
+  const name = $("catch-name-input").value.trim() || suggestName(cur.canvas);
+  const record = await db.add({ image, hash: cur.hash, name, seltenheit: cur.rarity });
   toast(`${pad(record.nr)} ${record.name} eingesammelt! ✨`);
-  // AI still busy? Fill in the description when it arrives.
-  if (!cur.entry && cur.describing) {
-    cur.describing
-      .then(async (entry) => {
-        const fresh = await db.get(record.id);
-        if (!fresh) return;
-        const nameEdited = fresh.name !== "Unbekannter Sticker";
-        await db.put({ ...fresh, ...entry, name: nameEdited ? fresh.name : entry.name });
-        if (activeTab === "dex") renderDex();
-      })
-      .catch(() => {});
-  }
+});
+
+$("catch-name-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") e.target.blur();
 });
 
 /* ---------------- Dex ---------------- */
@@ -343,15 +301,14 @@ async function openDetail(id) {
   $("detail-img").src = imageUrl(s);
   $("detail-name").textContent = s.name;
   metaPills($("detail-meta"), s);
-  $("detail-desc").textContent = s.beschreibung ?? "Noch keine Beschreibung.";
-  $("detail-fun").textContent = s.fun_fact ?? "";
+  $("detail-desc").textContent = s.notiz ?? "";
+  $("detail-fun").textContent = "";
   $("detail-found").textContent = `Gefunden am ${new Date(s.createdAt).toLocaleDateString("de-DE", {
     day: "numeric",
     month: "long",
     year: "numeric",
   })}`;
   $("detail-stage").classList.toggle("holo", isHolo(s.seltenheit));
-  $("detail-redescribe").textContent = s.beschreibung ? "Neu beschreiben" : "Beschreibung erzeugen";
   $("detail").classList.remove("hidden");
 }
 
@@ -370,22 +327,10 @@ $("detail-name").addEventListener("blur", async (e) => {
   }
 });
 
-$("detail-redescribe").addEventListener("click", async (e) => {
-  const btn = e.currentTarget;
+$("detail-desc").addEventListener("blur", async (e) => {
+  const notiz = e.target.textContent.trim();
   const s = await db.get(detailId);
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>';
-  try {
-    const entry = await describeSticker(await blobToCanvas(s.image));
-    await db.put({ ...s, ...entry });
-    await openDetail(s.id);
-    renderDex();
-  } catch (err) {
-    toast(describeError(err), 4000);
-    btn.textContent = "Neu beschreiben";
-  } finally {
-    btn.disabled = false;
-  }
+  if (s && notiz !== (s.notiz ?? "")) await db.put({ ...s, notiz });
 });
 
 $("detail-delete").addEventListener("click", async () => {
@@ -394,21 +339,6 @@ $("detail-delete").addEventListener("click", async () => {
   await db.remove(s.id);
   $("detail").classList.add("hidden");
   renderDex();
-});
-
-/* ---------------- Settings ---------------- */
-
-for (const [value, label] of Object.entries(MODELS)) $("model").append(new Option(label, value));
-$("open-settings").addEventListener("click", () => {
-  $("api-key").value = settings.apiKey;
-  $("model").value = settings.model;
-  $("settings").classList.remove("hidden");
-});
-$("settings-save").addEventListener("click", () => {
-  settings.apiKey = $("api-key").value.trim();
-  settings.model = $("model").value;
-  $("settings").classList.add("hidden");
-  toast(settings.apiKey ? "Gespeichert – KI-Erkennung ist aktiv 🤖" : "Gespeichert – ohne KI-Erkennung");
 });
 
 /* Close sheets via ✕ or tapping the backdrop */

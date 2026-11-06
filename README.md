@@ -4,24 +4,25 @@ Sticker sammeln wie Pokémon: Kamera drauf, die App erkennt den Sticker in der M
 schneidet ihn aus und legt ihn als Eintrag im Stickerdex ab. Eine Web-App (PWA), läuft direkt
 in Safari auf dem iPhone.
 
+## Demo
+
+👉 **https://raw.githack.com/jimrocko/Test/master/docs/index.html**
+
+Auf dem iPhone in Safari öffnen, Kamera erlauben, fertig. Mit Teilen → „Zum Home-Bildschirm“
+startet die App im Vollbild wie eine normale App.
+
 ## Funktionen
 
 - **Kamera-Tab:** Live-Vorschau mit Rahmen in der Mitte. Ein erkannter Sticker wird gelb markiert.
   Auslösen stellt ihn frei (transparenter Hintergrund, weiße Stickerkante).
+- **Fang-Karte:** Namensvorschlag nach Hauptfarbe („Blauer Sticker“), frei änderbar. Die Seltenheit
+  wird zufällig gezogen wie bei einem Booster-Pack: gewöhnlich 60 %, selten 25 %, episch 12 %, legendär 3 %.
 - **Stickerdex-Tab:** Nummerierte Sammlung (#001, #002, …), Seltenheitsfarben, Holo-Effekt für
-  epische und legendäre Sticker, Detailansicht mit Beschreibung, Fun Fact und Funddatum.
-  Den Namen kann man antippen und ändern.
+  epische und legendäre Sticker. In der Detailansicht kannst du Name und Notiz bearbeiten.
 - **Duplikat-Erkennung:** Fotografierst du einen Sticker, den du schon hast, zählt er als ×2, ×3, …
-- **KI-Beschreibung (optional):** Mit einem eigenen Anthropic-API-Schlüssel (⚙︎ im Dex) schreibt
-  Claude Name, Beschreibung, Kategorie, Seltenheit und Fun Fact.
-- **Alles lokal:** Die Freistellung läuft auf dem Gerät (MediaPipe „Magic Touch“). Die Sammlung
-  liegt in IndexedDB im Browser. Nach dem ersten Laden funktioniert die App auch offline.
-
-## Auf dem iPhone nutzen
-
-1. Die veröffentlichte Seite (GitHub Pages, siehe unten) in **Safari** öffnen.
-2. Teilen → **„Zum Home-Bildschirm“**. Danach startet die App im Vollbild wie eine normale App.
-3. Kamerazugriff erlauben.
+- **Kostenlos und lokal:** keine KI-API, kein Server, kein Account. Die Freistellung läuft auf dem
+  Gerät (MediaPipe „Magic Touch“), die Sammlung liegt in IndexedDB im Browser. Nach dem ersten
+  Laden funktioniert die App auch offline.
 
 > Die Sammlung ist an den Browser gebunden. Wer die Website-Daten in Safari löscht, löscht auch
 > den Stickerdex.
@@ -30,18 +31,13 @@ in Safari auf dem iPhone.
 
 ```bash
 npm install
-npm run dev      # Dev-Server, im WLAN erreichbar (für die Kamera auf dem Handy wird HTTPS benötigt)
-npm run build    # Produktions-Build nach dist/
+npm run dev      # Dev-Server
+npm run build    # baut die App nach docs/ – diesen Ordner danach mit committen
 ```
 
-`npm run dev` und `npm run build` kopieren vorher die MediaPipe-WASM-Dateien und laden das
-Segmentierungsmodell nach `public/vendor/`.
-
-## Veröffentlichen (GitHub Pages)
-
-Der Workflow `.github/workflows/deploy.yml` baut die App bei jedem Push auf `main` oder `master`
-und veröffentlicht sie. Einmalig einrichten: Repository → **Settings → Pages → Source:
-„GitHub Actions“**.
+Die Demo-Seite liefert den Ordner `docs/` direkt aus dem Repository aus. Nach Änderungen also
+`npm run build` ausführen und `docs/` committen. Alternativ geht auch GitHub Pages:
+Settings → Pages → „Deploy from a branch“ → `master` / `docs`.
 
 ## Aufbau
 
@@ -49,7 +45,7 @@ und veröffentlicht sie. Einmalig einrichten: Repository → **Settings → Page
 |---|---|
 | `src/main.js` | Tabs, Kamera, Live-Vorschau, Fang-Karte, Dex, Einstellungen |
 | `src/segment.js` | Sticker in der Bildmitte erkennen und freistellen (MediaPipe) |
-| `src/ai.js` | Stickerdex-Eintrag per Claude erzeugen |
+| `src/naming.js` | Namensvorschlag nach Farbe, Seltenheits-Ziehung |
 | `src/hash.js` | Perceptual Hash für die Duplikat-Erkennung |
 | `src/db.js` | Speicherung in IndexedDB |
 | `public/sw.js` | Offline-Cache |

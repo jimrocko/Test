@@ -36,7 +36,6 @@
             <h1>Stickerdex</h1>
             <p id="dex-count">0 Sticker gesammelt</p>
           </div>
-          <button class="icon-btn" id="open-settings" aria-label="Einstellungen">⚙︎</button>
         </header>
         <div class="grid" id="grid"></div>
         <div class="empty hidden" id="empty">
@@ -56,9 +55,10 @@
       <div class="catch-card" id="catch-card">
         <div class="catch-badge" id="catch-badge">Neuer Sticker!</div>
         <div class="sticker-stage" id="catch-stage"><img id="catch-img" alt="" class="die-cut" /></div>
-        <h2 id="catch-name">Wird erkannt …</h2>
+        <h2 id="catch-name"></h2>
+        <input id="catch-name-input" class="name-input" maxlength="40" placeholder="Gib ihm einen Namen" />
         <div class="meta" id="catch-meta"></div>
-        <p class="desc" id="catch-desc"><span class="spinner"></span></p>
+        <p class="desc" id="catch-desc"></p>
         <div class="actions">
           <button class="btn ghost" id="catch-retry">Nochmal</button>
           <button class="btn primary" id="catch-keep">Einsammeln ✨</button>
@@ -75,35 +75,11 @@
         <div class="sticker-stage big" id="detail-stage"><img id="detail-img" alt="" class="die-cut" /></div>
         <h2 id="detail-name" contenteditable="true" spellcheck="false"></h2>
         <div class="meta" id="detail-meta"></div>
-        <p class="desc" id="detail-desc"></p>
+        <p class="desc note" id="detail-desc" contenteditable="true" data-placeholder="Notiz hinzufügen (z. B. wo du ihn gefunden hast) …"></p>
         <p class="fun" id="detail-fun"></p>
         <p class="found" id="detail-found"></p>
         <div class="actions">
-          <button class="btn ghost" id="detail-redescribe">Neu beschreiben</button>
           <button class="btn danger" id="detail-delete">Löschen</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Einstellungen -->
-    <div class="sheet-backdrop hidden" id="settings">
-      <div class="sheet">
-        <button class="icon-btn close" data-close aria-label="Schließen">✕</button>
-        <h2>Einstellungen</h2>
-        <label>
-          Anthropic API-Schlüssel
-          <input type="password" id="api-key" placeholder="sk-ant-…" autocomplete="off" />
-        </label>
-        <p class="small">
-          Damit erkennt die KI deine Sticker und schreibt Name und Beschreibung. Der Schlüssel bleibt nur auf diesem Gerät.
-          Ohne Schlüssel funktioniert alles, nur ohne automatische Beschreibung.
-        </p>
-        <label>
-          KI-Modell
-          <select id="model"></select>
-        </label>
-        <div class="actions">
-          <button class="btn primary" id="settings-save">Speichern</button>
         </div>
       </div>
     </div>

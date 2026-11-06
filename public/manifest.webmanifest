@@ -2,7 +2,7 @@
   "name": "Stickerdex",
   "short_name": "Stickerdex",
   "description": "Sticker fotografieren, freistellen und sammeln.",
-  "start_url": "./",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
