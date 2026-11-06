@@ -2,6 +2,8 @@ import "./style.css";
 import * as db from "./db.js";
 import { rotatedHashes, colorHistogram, findDuplicate } from "./hash.js";
 import { suggestName, rollRarity } from "./naming.js";
+import { renderMap, currentLocation } from "./map.js";
+import { shareCard } from "./share.js";
 import { loadSegmenter, segmentCenter, maskStats, isPlausible, cutout, centerCrop, drawMaskOverlay } from "./segment.js";
 
 const $ = (id) => document.getElementById(id);
@@ -43,7 +45,10 @@ function metaPills(el, s) {
     p.textContent = text;
     el.append(p);
   };
-  if (s.seltenheit) add(s.seltenheit, "rarity");
+  if (s.seltenheit) {
+    add(s.seltenheit, "rarity");
+    el.lastChild.dataset.rarity = s.seltenheit;
+  }
   if (s.kategorie) add(s.kategorie);
   if (s.count > 1) add(`×${s.count}`);
 }
@@ -239,6 +244,8 @@ async function capture() {
 async function doCapture() {
   const shot = grabVisible(1024);
   if (!shot) return;
+  // Ask for the location right away (in parallel), it's saved as the Fundort.
+  const locationPromise = currentLocation();
   const flash = document.createElement("div");
   flash.className = "flash";
   $("view-camera").append(flash);
@@ -267,7 +274,7 @@ async function doCapture() {
   const hashes = rotatedHashes(sticker);
   const hist = colorHistogram(sticker);
   const duplicate = findDuplicate(hashes, hist, await db.getAll());
-  current = { canvas: sticker, hashes, hist, duplicate, rarity: rollRarity() };
+  current = { canvas: sticker, hashes, hist, duplicate, rarity: rollRarity(), locationPromise };
   showCatch();
 }
 
@@ -328,6 +335,11 @@ $("catch-keep").addEventListener("click", async () => {
   const name = $("catch-name-input").value.trim() || suggestName(cur.canvas);
   const record = await db.add({ image, hash: cur.hashes[0], hist: cur.hist, name, seltenheit: cur.rarity });
   toast(`${pad(record.nr)} ${record.name} eingesammelt! ✨`);
+  const location = await cur.locationPromise;
+  if (location) {
+    const fresh = await db.get(record.id);
+    if (fresh) await db.put({ ...fresh, location });
+  }
 });
 
 $("catch-name-input").addEventListener("keydown", (e) => {
@@ -336,8 +348,25 @@ $("catch-name-input").addEventListener("keydown", (e) => {
 
 /* ---------------- Dex ---------------- */
 
-async function renderDex() {
+let dexMode = "grid";
+document.querySelectorAll("#dex-mode button").forEach((b) =>
+  b.addEventListener("click", () => {
+    dexMode = b.dataset.mode;
+    renderDex();
+  }),
+);
+
+async function renderDex(focusId = null) {
   const stickers = (await db.getAll()).sort((a, b) => a.nr - b.nr);
+  document.querySelectorAll("#dex-mode button").forEach((b) => b.classList.toggle("active", b.dataset.mode === dexMode));
+  const onMap = dexMode === "map";
+  $("view-dex").classList.toggle("map-mode", onMap);
+  $("grid").classList.toggle("hidden", onMap);
+  $("map-wrap").classList.toggle("hidden", !onMap);
+  if (onMap) {
+    const n = await renderMap($("map"), stickers, imageUrl, openDetail, focusId);
+    $("map-empty").classList.toggle("hidden", n > 0);
+  }
   const grid = $("grid");
   grid.innerHTML = "";
   const total = stickers.reduce((n, s) => n + s.count, 0);
@@ -345,7 +374,7 @@ async function renderDex() {
     stickers.length === 1 ? "1 Sticker gesammelt" : `${stickers.length} Sticker gesammelt`;
   const dupes = total - stickers.length;
   if (dupes > 0) $("dex-count").textContent += ` · ${dupes} ${dupes === 1 ? "Duplikat" : "Duplikate"}`;
-  $("empty").classList.toggle("hidden", stickers.length > 0);
+  $("empty").classList.toggle("hidden", stickers.length > 0 || onMap);
   for (const s of stickers) {
     const card = document.createElement("button");
     card.className = "card";
@@ -382,8 +411,29 @@ async function openDetail(id) {
     year: "numeric",
   })}`;
   $("detail-stage").classList.toggle("holo", isHolo(s.seltenheit));
+  $("detail-map").classList.toggle("hidden", !s.location);
   $("detail").classList.remove("hidden");
 }
+
+$("detail-share").addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  try {
+    const result = await shareCard(await db.get(detailId));
+    if (result === "downloaded") toast("Sammelkarte gespeichert 🃏");
+  } catch (err) {
+    console.error(err);
+    toast("Teilen hat nicht geklappt.");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$("detail-map").addEventListener("click", () => {
+  $("detail").classList.add("hidden");
+  dexMode = "map";
+  renderDex(detailId);
+});
 
 $("detail-name").addEventListener("keydown", (e) => {
   if (e.key === "Enter") {

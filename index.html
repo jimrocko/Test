@@ -38,7 +38,15 @@
             <p id="dex-count">0 Sticker gesammelt</p>
           </div>
         </header>
+        <div class="segmented" id="dex-mode">
+          <button data-mode="grid" class="active">Sammlung</button>
+          <button data-mode="map">🗺️ Karte</button>
+        </div>
         <div class="grid" id="grid"></div>
+        <div class="map-wrap hidden" id="map-wrap">
+          <div id="map"></div>
+          <p class="map-empty hidden" id="map-empty">Noch keine Sticker mit Fundort.<br />Beim nächsten Foto einfach den Standort erlauben.</p>
+        </div>
         <div class="empty hidden" id="empty">
           <div class="empty-icon">🫥</div>
           <p>Noch keine Sticker.<br />Ab zur Kamera und los geht's!</p>
@@ -79,6 +87,10 @@
         <p class="desc note" id="detail-desc" contenteditable="true" data-placeholder="Notiz hinzufügen (z. B. wo du ihn gefunden hast) …"></p>
         <p class="fun" id="detail-fun"></p>
         <p class="found" id="detail-found"></p>
+        <div class="actions">
+          <button class="btn primary" id="detail-share">Teilen</button>
+          <button class="btn ghost" id="detail-map">📍 Fundort</button>
+        </div>
         <div class="actions">
           <button class="btn danger" id="detail-delete">Löschen</button>
         </div>

@@ -10,7 +10,8 @@
     "preview": "vite preview --host"
   },
   "dependencies": {
-    "@mediapipe/tasks-vision": "1.2.2"
+    "@mediapipe/tasks-vision": "1.2.2",
+    "leaflet": "^1.9.4"
   },
   "devDependencies": {
     "vite": "^8.3.6"

@@ -24,6 +24,10 @@ startet die App im Vollbild wie eine normale App.
 - **Duplikat-Erkennung:** Fotografierst du einen Sticker, den du schon hast, zählt er als ×2, ×3, …
   Verglichen werden Farben und Form, auch wenn der Sticker gedreht ist. Bei einem Fehlgriff hilft
   „Ist doch ein anderer“.
+- **Fundort-Karte:** Beim Fotografieren merkt sich die App den Standort, wenn du ihn erlaubst. Im
+  Dex zeigt „🗺️ Karte“ alle Sticker dort, wo du sie gefunden hast (OpenStreetMap).
+- **Teilen als Sammelkarte:** In der Detailansicht erzeugt „Teilen“ ein Kartenbild im Sammelkarten-Stil
+  und öffnet das iPhone-Teilen-Menü (WhatsApp, Fotos sichern, …).
 - **Kostenlos und lokal:** keine KI-API, kein Server, kein Account. Die Freistellung läuft auf dem
   Gerät (MediaPipe „Magic Touch“), die Sammlung liegt in IndexedDB im Browser. Nach dem ersten
   Laden funktioniert die App auch offline.
@@ -49,6 +53,8 @@ Settings → Pages → „Deploy from a branch“ → `master` / `docs`.
 |---|---|
 | `src/main.js` | Tabs, Kamera, Live-Vorschau, Fang-Karte, Dex, Einstellungen |
 | `src/segment.js` | Sticker in der Bildmitte erkennen und freistellen (MediaPipe) |
+| `src/map.js` | Fundort-Karte (Leaflet + OpenStreetMap), Standort abfragen |
+| `src/share.js` | Sammelkarte als Bild zeichnen und teilen |
 | `src/naming.js` | Namensvorschlag nach Farbe, Seltenheits-Ziehung |
 | `src/hash.js` | Perceptual Hash für die Duplikat-Erkennung |
 | `src/db.js` | Speicherung in IndexedDB |
