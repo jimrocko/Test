@@ -1,103 +1,321 @@
 <!doctype html>
 <html lang="de">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
-    <meta name="theme-color" content="#111318" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Stickerdex" />
-    <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
-    <link rel="icon" href="./icons/icon-192.png" />
-    <title>Stickerdex</title>
-  </head>
-  <body>
-    <main>
-      <!-- Tab 1: Kamera -->
-      <section id="view-camera" class="view active">
-        <video id="video" autoplay playsinline muted></video>
-        <canvas id="overlay"></canvas>
-        <div class="frame" id="frame"><span></span><span></span><span></span><span></span></div>
-        <div class="hint" id="hint">Sticker in die Mitte halten</div>
-        <div class="camera-error hidden" id="camera-error">
-          <p>📷 Kein Kamerazugriff.</p>
-          <p class="small">Bitte in den Einstellungen erlauben und die Seite neu laden.</p>
-          <button class="btn" id="camera-retry">Nochmal versuchen</button>
-        </div>
-        <button class="auto-toggle" id="auto-toggle">AUTO an</button>
-        <button class="shutter" id="shutter" aria-label="Foto machen"><span></span></button>
-      </section>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1a13">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jointlog">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Jointlog</title>
+<style>
+  :root { --bg:#0e1a13; --card:#16281d; --card2:#1d3426; --line:#2a4634; --txt:#e8f3ea; --dim:#8fb39a; --acc:#7ddc6f; --warn:#f2c14e; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:16px/1.4 -apple-system,system-ui,sans-serif; padding-bottom:calc(76px + env(safe-area-inset-bottom)); }
+  header { position:sticky; top:0; z-index:5; background:rgba(14,26,19,.92); backdrop-filter:blur(10px); padding:calc(10px + env(safe-area-inset-top)) 16px 10px; display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--line); }
+  header h1 { margin:0; font-size:20px; flex:1; }
+  main { padding:14px; max-width:640px; margin:0 auto; }
+  nav { position:fixed; bottom:0; left:0; right:0; display:flex; background:#0b150f; border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom); z-index:5; }
+  nav button { flex:1; background:none; border:0; color:var(--dim); padding:10px 0 12px; font-size:12px; }
+  nav button b { display:block; font-size:22px; }
+  nav button.on { color:var(--acc); }
+  nav .snap b { background:var(--acc); color:#0e1a13; width:46px; height:46px; line-height:46px; border-radius:50%; margin:-18px auto 2px; font-size:24px; box-shadow:0 4px 16px rgba(125,220,111,.35); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px; margin-bottom:12px; }
+  .entry { display:flex; gap:12px; padding:10px; cursor:pointer; }
+  .thumb { width:84px; height:84px; border-radius:12px; object-fit:cover; background:var(--card2); flex:none; display:flex; align-items:center; justify-content:center; font-size:30px; }
+  .entry .info { flex:1; min-width:0; }
+  .entry .t { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sub { color:var(--dim); font-size:13px; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+  .chip { background:var(--card2); border-radius:999px; padding:2px 9px; font-size:13px; }
+  .chip.open { background:rgba(242,193,78,.15); color:var(--warn); }
+  label { display:block; font-size:13px; color:var(--dim); margin:12px 0 4px; }
+  input, select, textarea { width:100%; background:var(--card2); color:var(--txt); border:1px solid var(--line); border-radius:10px; padding:11px; font:inherit; font-size:16px; }
+  textarea { min-height:70px; resize:vertical; }
+  .row { display:flex; gap:10px; } .row > * { flex:1; min-width:0; }
+  button.btn { width:100%; border:0; border-radius:12px; padding:14px; font:inherit; font-weight:600; background:var(--acc); color:#0e1a13; margin-top:12px; }
+  button.sec { background:var(--card2); color:var(--txt); border:1px solid var(--line); }
+  button.danger { background:#3a1b1b; color:#ff9b9b; }
+  button.small { width:auto; padding:8px 12px; margin:0; font-size:14px; }
+  .media { width:100%; max-height:60vh; border-radius:14px; background:#000; display:block; }
+  .pick { border:2px dashed var(--line); border-radius:16px; padding:26px; text-align:center; color:var(--dim); cursor:pointer; }
+  .pick b { display:block; font-size:40px; }
+  .slider { display:flex; align-items:center; gap:12px; }
+  .slider input { flex:1; padding:0; accent-color:var(--acc); border:0; background:none; height:32px; }
+  .slider output { width:44px; text-align:center; font-size:22px; font-weight:700; color:var(--acc); }
+  .stat { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .stat .card { margin:0; text-align:center; }
+  .stat .big { font-size:28px; font-weight:700; color:var(--acc); }
+  .empty { text-align:center; color:var(--dim); padding:50px 20px; }
+  .empty b { font-size:54px; display:block; }
+  .banner { background:rgba(242,193,78,.12); border:1px solid rgba(242,193,78,.35); color:var(--warn); border-radius:12px; padding:10px 12px; margin-bottom:12px; font-size:14px; }
+  .kv { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; } .kv div:nth-child(odd) { color:var(--dim); }
+  .seg { display:flex; gap:6px; flex-wrap:wrap; } .seg button { flex:1; min-width:70px; background:var(--card2); color:var(--txt); border:1px solid var(--line); border-radius:10px; padding:10px 6px; font:inherit; font-size:14px; }
+  .seg button.on { background:var(--acc); color:#0e1a13; border-color:var(--acc); font-weight:600; }
+  .toast { position:fixed; left:50%; bottom:100px; transform:translateX(-50%); background:#000c; padding:10px 16px; border-radius:999px; z-index:20; }
+  .hidden { display:none !important; }
+  a { color:var(--acc); }
+</style>
+</head>
+<body>
+<header><h1 id="title">🌿 Jointlog</h1><button id="back" class="btn sec small hidden">‹ Zurück</button></header>
+<main id="view"></main>
+<nav>
+  <button data-tab="feed" class="on"><b>📜</b>Verlauf</button>
+  <button data-tab="new" class="snap"><b>🎥</b>Snap</button>
+  <button data-tab="stats"><b>📊</b>Stats</button>
+</nav>
+<input id="file" type="file" accept="video/*,image/*" capture="environment" class="hidden">
 
-      <!-- Tab 2: Stickerdex -->
-      <section id="view-dex" class="view">
-        <header class="dex-header">
-          <div>
-            <h1>Stickerdex</h1>
-            <p id="dex-count">0 Sticker gesammelt</p>
-          </div>
-        </header>
-        <div class="segmented" id="dex-mode">
-          <button data-mode="grid" class="active">Sammlung</button>
-          <button data-mode="map">🗺️ Karte</button>
-        </div>
-        <div class="grid" id="grid"></div>
-        <div class="map-wrap hidden" id="map-wrap">
-          <div id="map"></div>
-          <p class="map-empty hidden" id="map-empty">Noch keine Sticker mit Fundort.<br />Beim nächsten Foto einfach den Standort erlauben.</p>
-        </div>
-        <div class="empty hidden" id="empty">
-          <div class="empty-icon">🫥</div>
-          <p>Noch keine Sticker.<br />Ab zur Kamera und los geht's!</p>
-        </div>
-      </section>
-    </main>
+<script>
+"use strict";
+// ---------- Speicher (IndexedDB im Browser) ----------
+const dbP = new Promise((res, rej) => {
+  const r = indexedDB.open("jointlog", 1);
+  r.onupgradeneeded = () => r.result.createObjectStore("entries", { keyPath: "id" });
+  r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+});
+const p = (r) => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const store = async (mode) => (await dbP).transaction("entries", mode).objectStore("entries");
+const db = {
+  all: async () => (await p((await store("readonly")).getAll())).sort((a, b) => b.when.localeCompare(a.when)),
+  get: async (id) => p((await store("readonly")).get(id)),
+  put: async (e) => p((await store("readwrite")).put(e)),
+  del: async (id) => p((await store("readwrite")).delete(id)),
+};
 
-    <nav class="tabbar">
-      <button data-tab="camera" class="active"><span>📷</span>Kamera</button>
-      <button data-tab="dex"><span>📖</span>Dex</button>
-    </nav>
+// ---------- Hilfen ----------
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now() + "-" + Math.random().toString(16).slice(2));
+const nowLocal = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
+const fmtDate = (s) => new Date(s).toLocaleString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+const toast = (t) => { document.querySelector(".toast")?.remove(); const d = document.createElement("div"); d.className = "toast"; d.textContent = t; document.body.append(d); setTimeout(() => d.remove(), 2200); };
+const mediaBlob = (e) => (e.media ? new Blob([e.media], { type: e.mediaType }) : null);
+const isVideo = (e) => (e.mediaType || "").startsWith("video");
+const TYPES = ["Joint", "Spliff", "Blunt", "Pur"];
+const MIX = ["pur", "wenig Tabak", "halb-halb", "viel Tabak"];
+const RATINGS = [["knall", "💥 Wie hat's geknallt?"], ["spot", "📍 Wie war der Spot?"], ["trip", "🌀 Wie war der Trip?"]];
 
-    <!-- Fang-Karte nach dem Foto -->
-    <div class="sheet-backdrop hidden" id="catch">
-      <div class="catch-card" id="catch-card">
-        <div class="catch-badge" id="catch-badge">Neuer Sticker!</div>
-        <div class="sticker-stage" id="catch-stage"><img id="catch-img" alt="" class="die-cut" /></div>
-        <h2 id="catch-name"></h2>
-        <input id="catch-name-input" class="name-input" maxlength="40" placeholder="Gib ihm einen Namen" />
-        <div class="meta" id="catch-meta"></div>
-        <p class="desc" id="catch-desc"></p>
-        <div class="actions">
-          <button class="btn ghost" id="catch-retry">Nochmal</button>
-          <button class="btn primary" id="catch-keep">Einsammeln ✨</button>
-        </div>
-        <button class="btn ghost wide hidden" id="catch-new-anyway">Ist ein anderer – neu einsammeln</button>
-      </div>
+// Vorschaubild aus Video oder Foto erzeugen (wird klein mit gespeichert)
+async function makeThumb(blob) {
+  const url = URL.createObjectURL(blob);
+  try {
+    let src, w, h;
+    if (blob.type.startsWith("image")) {
+      src = new Image(); src.src = url; await src.decode(); w = src.naturalWidth; h = src.naturalHeight;
+    } else {
+      src = document.createElement("video");
+      src.muted = true; src.playsInline = true; src.preload = "auto"; src.src = url; src.load();
+      await new Promise((res, rej) => { src.onloadeddata = res; src.onerror = rej; setTimeout(rej, 8000); });
+      src.currentTime = Math.min(0.5, (src.duration || 1) / 2);
+      await new Promise((res) => { src.onseeked = res; setTimeout(res, 3000); });
+      w = src.videoWidth; h = src.videoHeight;
+    }
+    const s = 240 / Math.min(w, h), c = document.createElement("canvas");
+    c.width = c.height = 240;
+    c.getContext("2d").drawImage(src, (240 - w * s) / 2, (240 - h * s) / 2, w * s, h * s);
+    return c.toDataURL("image/jpeg", 0.7);
+  } catch { return null; } finally { URL.revokeObjectURL(url); }
+}
+
+// ---------- Navigation ----------
+let backTo = null;
+function show(title, html, back = null) {
+  $("#title").textContent = title; $("#view").innerHTML = html; backTo = back;
+  $("#back").classList.toggle("hidden", !back); scrollTo(0, 0);
+}
+$("#back").onclick = () => backTo && backTo();
+document.querySelectorAll("nav button").forEach((b) => (b.onclick = () => go(b.dataset.tab)));
+function go(tab) {
+  document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
+  ({ feed: renderFeed, new: () => renderForm(), stats: renderStats })[tab]();
+}
+
+// ---------- Verlauf ----------
+async function renderFeed() {
+  const list = await db.all();
+  const open = list.filter((e) => !e.rated).length;
+  if (!list.length) return show("🌿 Jointlog", `<div class="empty"><b>🎥</b>Noch kein Joint drin.<br>Tipp unten auf <b style="display:inline;font-size:16px">Snap</b> und film deinen ersten.</div>`);
+  show("🌿 Jointlog", (open ? `<div class="banner">⏳ ${open} ${open === 1 ? "Joint wartet" : "Joints warten"} noch auf deine Bewertung</div>` : "") +
+    list.map((e) => `<div class="card entry" data-id="${e.id}">
+      ${e.thumb ? `<img class="thumb" src="${e.thumb}">` : `<div class="thumb">${isVideo(e) ? "🎥" : "🌿"}</div>`}
+      <div class="info">
+        <div class="t">${esc(e.strain || "Unbekannte Sorte")} · ${esc(e.type)}</div>
+        <div class="sub">${fmtDate(e.when)}${e.place ? " · " + esc(e.place) : ""}</div>
+        <div class="chips">${e.rated
+          ? `<span class="chip">💥 ${e.knall}</span><span class="chip">📍 ${e.spot}</span><span class="chip">🌀 ${e.trip}</span>`
+          : `<span class="chip open">⏳ noch bewerten</span>`}</div>
+      </div></div>`).join(""));
+  document.querySelectorAll(".entry").forEach((el) => (el.onclick = () => renderDetail(el.dataset.id)));
+}
+
+// ---------- Neuer Eintrag / Bearbeiten ----------
+let draft = null;
+function renderForm(existing = null) {
+  draft = existing ? { ...existing } : { id: uid(), when: nowLocal(), type: "Joint", mix: "pur", rated: false, knall: 5, spot: 5, trip: 5 };
+  const d = draft, back = existing ? () => renderDetail(existing.id) : null;
+  show(existing ? "✏️ Bearbeiten" : "🎥 Neuer Joint Snap", `
+    <div id="mediaBox"></div>
+    <label>🕒 Wann</label><input id="f-when" type="datetime-local" value="${esc(d.when)}">
+    <label>📍 Wo</label>
+    <div class="row"><input id="f-place" placeholder="z. B. Parkbank am See" value="${esc(d.place)}">
+      <button id="f-geo" class="btn sec small" style="flex:none">${d.lat ? "✅ GPS" : "📡 GPS"}</button></div>
+    <label>🌿 Sorte</label><input id="f-strain" placeholder="z. B. Amnesia Haze" value="${esc(d.strain)}">
+    <div class="row">
+      <div><label>⚖️ Menge (g)</label><input id="f-grams" type="number" inputmode="decimal" step="0.05" min="0" placeholder="0,5" value="${esc(d.grams)}"></div>
+      <div><label>🧪 THC (%)</label><input id="f-thc" type="number" inputmode="decimal" step="0.5" min="0" placeholder="optional" value="${esc(d.thc)}"></div>
     </div>
-
-    <!-- Detailansicht -->
-    <div class="sheet-backdrop hidden" id="detail">
-      <div class="sheet">
-        <button class="icon-btn close" data-close aria-label="Schließen">✕</button>
-        <div class="detail-nr" id="detail-nr"></div>
-        <div class="sticker-stage big" id="detail-stage"><img id="detail-img" alt="" class="die-cut" /></div>
-        <h2 id="detail-name" contenteditable="true" spellcheck="false"></h2>
-        <div class="meta" id="detail-meta"></div>
-        <p class="desc note" id="detail-desc" contenteditable="true" data-placeholder="Notiz hinzufügen (z. B. wo du ihn gefunden hast) …"></p>
-        <p class="fun" id="detail-fun"></p>
-        <p class="found" id="detail-found"></p>
-        <div class="actions">
-          <button class="btn primary" id="detail-share">Teilen</button>
-          <button class="btn ghost" id="detail-map">📍 Fundort</button>
-        </div>
-        <div class="actions">
-          <button class="btn danger" id="detail-delete">Löschen</button>
-        </div>
-      </div>
+    <label>🚬 Art</label><div class="seg" id="f-type">${TYPES.map((t) => `<button data-v="${t}" class="${t === d.type ? "on" : ""}">${t}</button>`).join("")}</div>
+    <label>🍂 Mische</label><div class="seg" id="f-mix">${MIX.map((t) => `<button data-v="${t}" class="${t === d.mix ? "on" : ""}">${t}</button>`).join("")}</div>
+    <label>✍️ Was war noch drin / Notiz</label><textarea id="f-note" placeholder="Filter, Paper, mit wem, Musik …">${esc(d.note)}</textarea>
+    <div class="card" style="margin-top:14px">
+      <label style="margin-top:0;display:flex;align-items:center;gap:10px;color:var(--txt);font-size:15px">
+        <input id="f-rated" type="checkbox" style="width:22px;height:22px" ${d.rated ? "checked" : ""}> Schon geraucht, jetzt bewerten</label>
+      <div id="f-ratings" class="${d.rated ? "" : "hidden"}">${ratingSliders(d)}</div>
+      <div class="sub ${d.rated ? "hidden" : ""}" id="f-later">Kein Stress: Erst rauchen, später im Verlauf bewerten.</div>
     </div>
+    <button class="btn" id="f-save">💾 Speichern</button>`, back);
 
-    <div class="toast hidden" id="toast"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
+  drawMedia();
+  bindSliders();
+  for (const k of ["type", "mix"]) $("#f-" + k).onclick = (ev) => {
+    const b = ev.target.closest("button"); if (!b) return;
+    d[k] = b.dataset.v; $("#f-" + k).querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+  };
+  $("#f-rated").onchange = (ev) => { $("#f-ratings").classList.toggle("hidden", !ev.target.checked); $("#f-later").classList.toggle("hidden", ev.target.checked); };
+  $("#f-geo").onclick = () => locate(d, $("#f-geo"));
+  $("#f-save").onclick = async () => {
+    Object.assign(d, {
+      when: $("#f-when").value || nowLocal(), place: $("#f-place").value.trim(), strain: $("#f-strain").value.trim(),
+      grams: $("#f-grams").value, thc: $("#f-thc").value, note: $("#f-note").value.trim(), rated: $("#f-rated").checked,
+    });
+    readSliders(d);
+    await db.put(d); toast(d.rated ? "Gespeichert 🌿" : "Gespeichert, bewerte ihn später ⏳");
+    existing ? renderDetail(d.id) : go("feed");
+  };
+  if (!existing && !d.media) setTimeout(() => $("#file").click(), 50);  // direkt Kamera öffnen
+}
+
+function drawMedia() {
+  const box = $("#mediaBox"), b = mediaBlob(draft);
+  if (!b) { box.innerHTML = `<div class="pick" id="pick"><b>🎥</b>Joint Snap aufnehmen<br><span class="sub">Video oder Foto</span></div>`; }
+  else {
+    const url = URL.createObjectURL(b);
+    box.innerHTML = (isVideo(draft) ? `<video class="media" src="${url}#t=0.1" controls playsinline muted loop></video>` : `<img class="media" src="${url}">`) +
+      `<button class="btn sec" id="pick">🔁 Neu aufnehmen</button>`;
+  }
+  $("#pick").onclick = () => $("#file").click();
+}
+$("#file").onchange = async (ev) => {
+  const f = ev.target.files[0]; ev.target.value = ""; if (!f || !draft) return;
+  draft.media = await f.arrayBuffer(); draft.mediaType = f.type || "video/mp4";
+  drawMedia(); draft.thumb = await makeThumb(f);
+  if (!draft.lat) locate(draft, $("#f-geo"));  // Standort gleich mit holen
+};
+
+function locate(d, btn) {
+  if (!navigator.geolocation) return toast("Standort nicht verfügbar");
+  if (btn) btn.textContent = "⏳";
+  navigator.geolocation.getCurrentPosition(
+    (pos) => { d.lat = +pos.coords.latitude.toFixed(5); d.lon = +pos.coords.longitude.toFixed(5); if (btn) btn.textContent = "✅ GPS"; },
+    () => { if (btn) btn.textContent = "📡 GPS"; toast("Standort nicht erlaubt"); },
+    { enableHighAccuracy: true, timeout: 10000 });
+}
+
+const ratingSliders = (d) => RATINGS.map(([k, t]) => `<label>${t}</label>
+  <div class="slider"><input type="range" min="1" max="10" step="1" id="r-${k}" value="${d[k] || 5}"><output id="o-${k}">${d[k] || 5}</output></div>`).join("");
+const bindSliders = () => RATINGS.forEach(([k]) => ($("#r-" + k).oninput = (e) => ($("#o-" + k).textContent = e.target.value)));
+const readSliders = (d) => RATINGS.forEach(([k]) => (d[k] = +$("#r-" + k).value));
+
+// ---------- Detailansicht ----------
+async function renderDetail(id) {
+  const e = await db.get(id); if (!e) return go("feed");
+  const b = mediaBlob(e), url = b && URL.createObjectURL(b);
+  show(e.strain || "Joint", `
+    ${url ? (isVideo(e) ? `<video class="media" src="${url}#t=0.1" controls playsinline loop></video>` : `<img class="media" src="${url}">`) : ""}
+    <div class="card" style="margin-top:12px"><div class="kv">
+      <div>🕒 Wann</div><div>${fmtDate(e.when)}</div>
+      <div>📍 Wo</div><div>${esc(e.place || "–")}${e.lat ? ` · <a href="https://www.openstreetmap.org/?mlat=${e.lat}&mlon=${e.lon}#map=17/${e.lat}/${e.lon}" target="_blank">Karte</a>` : ""}</div>
+      <div>🌿 Sorte</div><div>${esc(e.strain || "–")}${e.thc ? ` (${esc(e.thc)} % THC)` : ""}</div>
+      <div>🚬 Art</div><div>${esc(e.type)} · ${esc(e.mix)}${e.grams ? ` · ${esc(String(e.grams).replace(".", ","))} g` : ""}</div>
+      ${e.note ? `<div>✍️ Notiz</div><div>${esc(e.note).replace(/\n/g, "<br>")}</div>` : ""}
+    </div></div>
+    <div class="card">${e.rated
+      ? `<div class="stat" style="grid-template-columns:1fr 1fr 1fr">${RATINGS.map(([k, t]) => `<div><div class="big" style="text-align:center">${e[k]}</div><div class="sub" style="text-align:center">${t.split(" ")[0]} ${k[0].toUpperCase() + k.slice(1)}</div></div>`).join("")}</div>`
+      : `<b>⏳ Noch nicht bewertet</b><div class="sub">Geraucht? Dann jetzt bewerten:</div>${ratingSliders(e)}<button class="btn" id="d-rate">✅ Bewertung speichern</button>`}
+    </div>
+    <div class="row"><button class="btn sec" id="d-share">📤 Teilen</button><button class="btn sec" id="d-edit">✏️ Bearbeiten</button></div>
+    <button class="btn danger" id="d-del">🗑️ Löschen</button>`, () => go("feed"));
+
+  if (!e.rated) { bindSliders(); $("#d-rate").onclick = async () => { readSliders(e); e.rated = true; await db.put(e); toast("Bewertet 🔥"); renderDetail(id); }; }
+  $("#d-edit").onclick = () => renderForm(e);
+  $("#d-del").onclick = async () => { if (confirm("Diesen Eintrag wirklich löschen?")) { await db.del(id); go("feed"); } };
+  $("#d-share").onclick = () => share(e, b);
+}
+
+async function share(e, b) {
+  const text = `🌿 ${e.strain || "Joint"} (${e.type}, ${e.mix})\n🕒 ${fmtDate(e.when)}${e.place ? "\n📍 " + e.place : ""}` +
+    (e.rated ? `\n💥 Knall ${e.knall}/10 · 📍 Spot ${e.spot}/10 · 🌀 Trip ${e.trip}/10` : "") + (e.note ? `\n✍️ ${e.note}` : "");
+  const data = { text };
+  if (b) { const ext = (e.mediaType.split("/")[1] || "mp4").replace("quicktime", "mov"); const f = new File([b], `jointsnap.${ext}`, { type: e.mediaType }); if (navigator.canShare?.({ files: [f] })) data.files = [f]; }
+  try { if (navigator.share) await navigator.share(data); else { await navigator.clipboard.writeText(text); toast("Text kopiert"); } } catch {}
+}
+
+// ---------- Statistik ----------
+async function renderStats() {
+  const list = await db.all(), rated = list.filter((e) => e.rated);
+  const month = new Date().toISOString().slice(0, 7);
+  const grams = list.reduce((s, e) => s + (parseFloat(e.grams) || 0), 0);
+  const best = (key, field) => {
+    const m = {}; rated.filter((e) => e[key]).forEach((e) => (m[e[key]] ??= []).push(e[field]));
+    return Object.entries(m).map(([n, v]) => [n, avg(v), v.length]).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  };
+  const top = (rows, icon) => rows.length ? rows.map(([n, a, c]) => `<div style="display:flex;justify-content:space-between"><span>${esc(n)}</span><span class="sub">${icon} ${a.toFixed(1)} · ${c}×</span></div>`).join("") : `<div class="sub">Noch keine Bewertungen</div>`;
+  show("📊 Stats", `
+    <div class="stat">
+      <div class="card"><div class="big">${list.length}</div><div class="sub">Joints gesamt</div></div>
+      <div class="card"><div class="big">${list.filter((e) => e.when.startsWith(month)).length}</div><div class="sub">diesen Monat</div></div>
+      <div class="card"><div class="big">${grams.toFixed(1).replace(".", ",")} g</div><div class="sub">Menge gesamt</div></div>
+      <div class="card"><div class="big">${rated.length ? avg(rated.map((e) => e.knall)).toFixed(1) : "–"}</div><div class="sub">💥 Ø Knall</div></div>
+      <div class="card"><div class="big">${rated.length ? avg(rated.map((e) => e.spot)).toFixed(1) : "–"}</div><div class="sub">📍 Ø Spot</div></div>
+      <div class="card"><div class="big">${rated.length ? avg(rated.map((e) => e.trip)).toFixed(1) : "–"}</div><div class="sub">🌀 Ø Trip</div></div>
+    </div>
+    <div class="card" style="margin-top:12px"><b>🏆 Sorten mit dem meisten Knall</b>${top(best("strain", "knall"), "💥")}</div>
+    <div class="card"><b>🏞️ Beste Spots</b>${top(best("place", "spot"), "📍")}</div>
+    <div class="card"><b>💾 Backup</b><div class="sub">Alles liegt nur auf diesem Handy im Browser. Ab und zu sichern!</div>
+      <div class="row"><button class="btn sec" id="s-exp">⬇️ Exportieren</button><button class="btn sec" id="s-imp">⬆️ Importieren</button></div>
+      <input type="file" id="s-file" accept="application/json,.json" class="hidden"></div>`);
+  $("#s-exp").onclick = exportAll;
+  $("#s-imp").onclick = () => $("#s-file").click();
+  $("#s-file").onchange = (ev) => ev.target.files[0] && importAll(ev.target.files[0]);
+}
+
+// Backup als JSON (Videos als Base64)
+const buf2b64 = (buf) => new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result.split(",")[1]); fr.readAsDataURL(new Blob([buf])); });
+const b642buf = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0)).buffer;
+async function exportAll() {
+  toast("Backup wird erstellt …");
+  const out = await Promise.all((await db.all()).map(async (e) => ({ ...e, media: e.media ? await buf2b64(e.media) : null })));
+  const f = new File([JSON.stringify({ app: "jointlog", v: 1, entries: out })], `jointlog-${new Date().toISOString().slice(0, 10)}.json`, { type: "application/json" });
+  if (navigator.canShare?.({ files: [f] })) { try { await navigator.share({ files: [f] }); } catch {} return; }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
+}
+async function importAll(file) {
+  try {
+    const data = JSON.parse(await file.text());
+    for (const e of data.entries || []) await db.put({ ...e, media: e.media ? b642buf(e.media) : null });
+    toast(`${(data.entries || []).length} Einträge importiert`); renderStats();
+  } catch { toast("Datei konnte nicht gelesen werden"); }
+}
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+navigator.storage?.persist?.();
+go("feed");
+</script>
+</body>
 </html>
