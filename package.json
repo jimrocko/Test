@@ -1,0 +1,20 @@
+{
+  "name": "stickerdex",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Sticker sammeln wie Pokémon – Kamera + Stickerdex als Web-App",
+  "scripts": {
+    "assets": "node scripts/fetch-assets.mjs",
+    "dev": "npm run assets && vite --host",
+    "build": "npm run assets && vite build",
+    "preview": "vite preview --host"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
+    "@mediapipe/tasks-vision": "^1.2.2"
+  },
+  "devDependencies": {
+    "vite": "^8.3.6"
+  }
+}

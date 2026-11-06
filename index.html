@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#111318" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Stickerdex" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <link rel="icon" href="./icons/icon-192.png" />
+    <title>Stickerdex</title>
+  </head>
+  <body>
+    <main>
+      <!-- Tab 1: Kamera -->
+      <section id="view-camera" class="view active">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="overlay"></canvas>
+        <div class="frame" id="frame"><span></span><span></span><span></span><span></span></div>
+        <div class="hint" id="hint">Sticker in die Mitte halten</div>
+        <div class="camera-error hidden" id="camera-error">
+          <p>📷 Kein Kamerazugriff.</p>
+          <p class="small">Bitte in den Einstellungen erlauben und die Seite neu laden.</p>
+          <button class="btn" id="camera-retry">Nochmal versuchen</button>
+        </div>
+        <button class="shutter" id="shutter" aria-label="Foto machen"><span></span></button>
+      </section>
+
+      <!-- Tab 2: Stickerdex -->
+      <section id="view-dex" class="view">
+        <header class="dex-header">
+          <div>
+            <h1>Stickerdex</h1>
+            <p id="dex-count">0 Sticker gesammelt</p>
+          </div>
+          <button class="icon-btn" id="open-settings" aria-label="Einstellungen">⚙︎</button>
+        </header>
+        <div class="grid" id="grid"></div>
+        <div class="empty hidden" id="empty">
+          <div class="empty-icon">🫥</div>
+          <p>Noch keine Sticker.<br />Ab zur Kamera und los geht's!</p>
+        </div>
+      </section>
+    </main>
+
+    <nav class="tabbar">
+      <button data-tab="camera" class="active"><span>📷</span>Kamera</button>
+      <button data-tab="dex"><span>📖</span>Dex</button>
+    </nav>
+
+    <!-- Fang-Karte nach dem Foto -->
+    <div class="sheet-backdrop hidden" id="catch">
+      <div class="catch-card" id="catch-card">
+        <div class="catch-badge" id="catch-badge">Neuer Sticker!</div>
+        <div class="sticker-stage" id="catch-stage"><img id="catch-img" alt="" class="die-cut" /></div>
+        <h2 id="catch-name">Wird erkannt …</h2>
+        <div class="meta" id="catch-meta"></div>
+        <p class="desc" id="catch-desc"><span class="spinner"></span></p>
+        <div class="actions">
+          <button class="btn ghost" id="catch-retry">Nochmal</button>
+          <button class="btn primary" id="catch-keep">Einsammeln ✨</button>
+        </div>
+        <button class="link hidden" id="catch-new-anyway">Ist doch ein anderer – neu einsammeln</button>
+      </div>
+    </div>
+
+    <!-- Detailansicht -->
+    <div class="sheet-backdrop hidden" id="detail">
+      <div class="sheet">
+        <button class="icon-btn close" data-close aria-label="Schließen">✕</button>
+        <div class="detail-nr" id="detail-nr"></div>
+        <div class="sticker-stage big" id="detail-stage"><img id="detail-img" alt="" class="die-cut" /></div>
+        <h2 id="detail-name" contenteditable="true" spellcheck="false"></h2>
+        <div class="meta" id="detail-meta"></div>
+        <p class="desc" id="detail-desc"></p>
+        <p class="fun" id="detail-fun"></p>
+        <p class="found" id="detail-found"></p>
+        <div class="actions">
+          <button class="btn ghost" id="detail-redescribe">Neu beschreiben</button>
+          <button class="btn danger" id="detail-delete">Löschen</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Einstellungen -->
+    <div class="sheet-backdrop hidden" id="settings">
+      <div class="sheet">
+        <button class="icon-btn close" data-close aria-label="Schließen">✕</button>
+        <h2>Einstellungen</h2>
+        <label>
+          Anthropic API-Schlüssel
+          <input type="password" id="api-key" placeholder="sk-ant-…" autocomplete="off" />
+        </label>
+        <p class="small">
+          Damit erkennt die KI deine Sticker und schreibt Name und Beschreibung. Der Schlüssel bleibt nur auf diesem Gerät.
+          Ohne Schlüssel funktioniert alles, nur ohne automatische Beschreibung.
+        </p>
+        <label>
+          KI-Modell
+          <select id="model"></select>
+        </label>
+        <div class="actions">
+          <button class="btn primary" id="settings-save">Speichern</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast hidden" id="toast"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
